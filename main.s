@@ -28,12 +28,33 @@ CNTPORT2 = $4017
 .segment "VECTORS"
     .addr NMI
     .addr RESET
-    .addr IRQ
+    .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
 
 .segment "CODE"
     
+    NMI:
+    svregs:
+        pha
+        tya
+        pha
+        txa
+        pha
+
+    ldgfx:
+        ldx #$00    ; use dma
+        stx OAMADDR
+
+    @
+
+    ldregs:
+        pla
+        tax
+        pla
+        tay
+        pla
+
     RESET:
         sei ; disable irq
         cld ; disable broken decimal mode
@@ -70,10 +91,43 @@ CNTPORT2 = $4017
         jmp vbwait
 
     loadpalettes:
-        lda PPU_STATUS ; read from $2002 to clear PPUADDR write flag
+        lda PPUSTATUS ; read from $2002 to clear PPUADDR write flag
 
         lda #$3f
+        sta PPUADDR
+        lda #$00
+        sta PPUADDR
+
+        ldx #$00
+
+    @bgpaletteload:
+        lda bgpalettes, x
+        sta PPUDATA
+        inx
+        cpx #$10
+        bne @bgpaletteload
     
+        ldx #$00
+
+    @sprpaletteload:
+        lda sprpalettes, x
+        sta PPUDATA
+        inx
+        cpx #$10
+        bne sprpaletteload
+
+    enablerender:
+        lda #$80 ; nmi enable
+        sta PPUCTRL
+
+        lda #$10 ; sprite enable
+        sta PPUMASK
+
+    main:
+
+    
+
+     
     bgpalettes:
     ; BG palettes, 4 total
         .byte $0f, $00, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
@@ -83,7 +137,7 @@ CNTPORT2 = $4017
 
     sprpalettes:
         ; SPR palettes, 4 total
-        .byte $0f, $00, $00, $00 ; SPR palette 1 ;; black, blue, white, empty
+        .byte $0f, $12, $20, $00 ; SPR palette 1 ;; black, blue, white, empty
         .byte $00, $00, $00, $00 ; SPR palette 2 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 3 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
