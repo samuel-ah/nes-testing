@@ -18,6 +18,12 @@ DMC_FREQ = $4010
 CNTPORT1 = $4016
 CNTPORT2 = $4017
 
+.struct Sprite_1x1
+    ypos .byte
+    index .byte
+    attributes .byte
+    xpos .byte
+.endstruct
 
 .segment "HEADER"
     .byte "NES", $1a    ; iNES header format
@@ -31,9 +37,9 @@ CNTPORT2 = $4017
     .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
+    ball: .res .sizeof(Sprite_1x1)
 
 .segment "CODE"
-    
     NMI:
     svregs:
         pha
@@ -42,11 +48,13 @@ CNTPORT2 = $4017
         txa
         pha
 
-    ldgfx:
-        ldx #$00    ; use dma
+    initoam:
+        ldx #$00    ; OAMADDR 0
         stx OAMADDR
 
-    @
+    oamtransfer:
+
+
 
     ldregs:
         pla
@@ -54,6 +62,7 @@ CNTPORT2 = $4017
         pla
         tay
         pla
+        rti
 
     RESET:
         sei ; disable irq
@@ -125,9 +134,6 @@ CNTPORT2 = $4017
 
     main:
 
-    
-
-     
     bgpalettes:
     ; BG palettes, 4 total
         .byte $0f, $00, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
@@ -143,12 +149,12 @@ CNTPORT2 = $4017
         .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
 
 .segment "CHARS"
-    ; sprite 1
-    .byte %11111111
-    .byte %10000001
-    .byte %10000001
-    .byte %10000001
-    .byte %10000001
-    .byte %10000001
-    .byte %10000001
-    .byte %11111111
+    ; sprite 0
+    .byte %11111111 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %10000001 ; 00000000
+    .byte %11111111 ; 00000000

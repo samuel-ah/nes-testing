@@ -188,6 +188,9 @@ hello:
   .byte $00, $00, $00, $00 ;$17
   .byte $6c, $00, $00, $08 ;$1b
 
+; 6  12
+; 01101100
+
 palettes:
   ; Background Palette
   .byte $0f, $00, $00, $00 ;$03
