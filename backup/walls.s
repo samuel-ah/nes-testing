@@ -221,7 +221,7 @@ nmi:
   rti
 
 sprites:
-  ; Sprite table (ball is index $6c and $08 is the end of the table)
+  
   .byte $00, $00, $00, $00 
   .byte $00, $00, $00, $00 
   .byte $00, $00, $00, $00 

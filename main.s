@@ -26,64 +26,43 @@ CNTPORT2 = $4017
 .endstruct
 
 .segment "HEADER"
-    .byte "NES", $1a    ; iNES header format
-    .byte $02           ; 2 segments 16kb PRG
-    .byte $01           ; 1 segments 8kb CHR
+    .byte $4e, $45, $53, $1a    ; iNES header format
+    .byte 2           ; 2 segments 16kb PRG
+    .byte 1           ; 1 segments 8kb CHR
     .byte $01, $00      ; mapper 0, set mirroring vertical
 
 .segment "VECTORS"
-    .addr NMI
-    .addr RESET
+    .addr nmi
+    .addr reset
     .addr 0 ; irq unused
 
+.segment "STARTUP"
+
 .segment "ZEROPAGE"
-    ball: .res .sizeof(Sprite_1x1)
+    square: .res .sizeof(Sprite_1x1)
+    cnt1buttons: .res 1
 
 .segment "CODE"
-    NMI:
-    svregs:
-        pha
-        tya
-        pha
-        txa
-        pha
 
-    initoam:
-        ldx #$00    ; OAMADDR 0
-        stx OAMADDR
+reset:
+    sei ; disable irq
+    cld ; disable broken decimal mode
 
-    oamtransfer:
+    ldx #$40   ; disable APU irqs
+    stx $4017
+    
+    ldx #$ff  ; initialize stack
+    txs
+    
+    inx ; X: 255 -> 0
 
+    stx PPUCTRL ; disable nmi
+    stx PPUMASK ; disable screen output 
+    stx DMC_FREQ ; disable APU DMC (delta modulation channel) irqs
 
-
-    ldregs:
-        pla
-        tax
-        pla
-        tay
-        pla
-        rti
-
-    RESET:
-        sei ; disable irq
-        cld ; disable broken decimal mode
-
-        ldx #$40   ; disable APU irqs
-        stx $4017
-        
-        ldx #$ff  ; initialize stack
-        txs
-        
-        inx ; X: 255 -> 0
-
-        stx PPUCTRL ; disable nmi
-        stx PPUMASK ; disable screen output 
-        stx DMC_FREQ ; disable APU DMC (delta modulation channel) irqs
-
-    vbwait:
+    vbwait1:
         bit PPUSTATUS
-        bpl vbwait
-        rts 
+        bpl vbwait1
     
     clearmem:
         lda #$00
@@ -97,9 +76,12 @@ CNTPORT2 = $4017
         sta $0700, x
         inx
         bne clearmem
-        jmp vbwait
 
-    loadpalettes:
+    vbwait2:
+        bit PPUSTATUS
+        bpl vbwait2
+
+    ldpalettes:
         lda PPUSTATUS ; read from $2002 to clear PPUADDR write flag
 
         lda #$3f
@@ -109,21 +91,21 @@ CNTPORT2 = $4017
 
         ldx #$00
 
-    @bgpaletteload:
+    @bgpaletteld:
         lda bgpalettes, x
         sta PPUDATA
         inx
         cpx #$10
-        bne @bgpaletteload
+        bne @bgpaletteld
     
         ldx #$00
 
-    @sprpaletteload:
+    @sprpaletteld:
         lda sprpalettes, x
         sta PPUDATA
         inx
         cpx #$10
-        bne sprpaletteload
+        bne @sprpaletteld
 
     enablerender:
         lda #$80 ; nmi enable
@@ -132,7 +114,111 @@ CNTPORT2 = $4017
         lda #$10 ; sprite enable
         sta PPUMASK
 
+    initpos:
+        lda #$08
+        sta square+Sprite_1x1::xpos
+        lda #$10
+        sta square+Sprite_1x1::ypos
+
     main:
+        jsr readcnt1
+    ; 76543210
+    ; ABsSUDLR - controller buttons
+
+    @left:
+        lda cnt1buttons
+        and #%00000010
+        beq @up
+        lda square+Sprite_1x1::xpos
+        cmp #$08
+        beq @up
+        sec
+        sbc #$01
+        sta square+Sprite_1x1::xpos
+        
+    @up:
+        lda cnt1buttons
+        and #%00001000
+        beq @right
+        lda square+Sprite_1x1::ypos
+        cmp #$0e
+        beq @right
+        sec
+        sbc #$01
+        sta square+Sprite_1x1::ypos
+    
+    @right:
+        lda cnt1buttons
+        and #%00000001
+        beq @down
+        lda square+Sprite_1x1::xpos
+        cmp #$f0
+        beq @down
+        clc
+        adc #$01
+        sta square+Sprite_1x1::xpos
+
+    @down:
+        lda cnt1buttons
+        and #%00000100
+        beq @endinput
+        lda square +Sprite_1x1::ypos
+        cmp #$d7
+        beq @endinput
+        clc
+        adc #$01
+        sta square+Sprite_1x1::ypos
+
+    @endinput:
+        jsr nmiwait
+        jmp main
+
+    nmiwait:
+        bit PPUSTATUS
+        bpl nmiwait
+        rts
+
+    readcnt1:
+        lda #$01
+        sta CNTPORT1 ; write 1 then 0 to controller port to start serial transfer
+        sta cnt1buttons ; store 1 in buttons
+        lsr a ; A: 1 -> 0
+        sta CNTPORT1
+
+    @ldbuttons:
+        lda CNTPORT1
+        lsr a
+        rol cnt1buttons
+        bcc @ldbuttons
+        rts
+
+nmi:
+    svregs:
+        pha
+        tya
+        pha
+        txa
+        pha
+
+    initoam:
+        ldx #$00    ; OAMADDR 0
+        stx OAMADDR
+        clc
+
+    oamtransfer:
+        lda square, x
+        sta OAMDATA
+        inx
+        cpx .sizeof(Sprite_1x1) - 1
+        bne oamtransfer
+
+    ldregs:
+        pla
+        tax
+        pla
+        tay
+        pla
+        rti
 
     bgpalettes:
     ; BG palettes, 4 total
@@ -151,10 +237,19 @@ CNTPORT2 = $4017
 .segment "CHARS"
     ; sprite 0
     .byte %11111111 ; 00000000
-    .byte %10000001 ; 00000000
-    .byte %10000001 ; 00000000
-    .byte %10000001 ; 00000000
-    .byte %10000001 ; 00000000
-    .byte %10000001 ; 00000000
-    .byte %10000001 ; 00000000
+    .byte %10000001 ; 01111110
+    .byte %10000001 ; 01111110
+    .byte %10000001 ; 01111110
+    .byte %10000001 ; 01111110
+    .byte %10000001 ; 01111110
+    .byte %10000001 ; 01111110
     .byte %11111111 ; 00000000
+
+    .byte %00000000
+    .byte %01111110
+    .byte %01111110
+    .byte %01111110
+    .byte %01111110
+    .byte %01111110
+    .byte %01111110
+    .byte %00000000
