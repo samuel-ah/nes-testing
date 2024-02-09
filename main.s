@@ -25,11 +25,19 @@ CNTPORT2 = $4017
     xpos .byte
 .endstruct
 
+.struct Palette
+    col0 .byte
+    col1 .byte
+    col2 .byte
+    col3 .byte
+.endstruct
+
 .segment "HEADER"
-    .byte $4e, $45, $53, $1a    ; iNES header format
-    .byte 2           ; 2 segments 16kb PRG
-    .byte 1           ; 1 segments 8kb CHR
-    .byte $01, $00      ; mapper 0, set mirroring vertical
+    .byte "NES", $1a    ; iNES header format
+    .byte $02           ; 2 segments 16kb PRG
+    .byte $01           ; 1 segments 8kb CHR
+    .byte $01           ; mapper 0
+    .byte $00           ; set mirroring vertical
 
 .segment "VECTORS"
     .addr nmi
@@ -41,8 +49,50 @@ CNTPORT2 = $4017
 .segment "ZEROPAGE"
     square: .res .sizeof(Sprite_1x1)
     cnt1buttons: .res 1
+    nmiflag: .res 1
 
 .segment "CODE"
+nmi:
+    svregs:
+        pha
+        tya
+        pha
+        txa
+        pha
+        lda #$01
+        sta nmiflag
+
+    initoam:
+        ldx #$00    ; OAMADDR 0
+        stx OAMADDR
+        clc
+
+    oamtransfer:
+        lda square, x
+        sta OAMDATA
+        inx
+        cpx .sizeof(Sprite_1x1) - 1
+        bne oamtransfer
+
+    ldregs:
+        pla
+        tax
+        pla
+        tay
+        pla
+        rti
+
+nmiwaitunsafe:
+    bit PPUSTATUS
+    bpl nmiwait
+    rts
+
+nmiwaitsafe:
+    lda nmiflag
+    beq nmiwaitsafe
+    lda #$00
+    sta nmiflag
+    rts
 
 reset:
     sei ; disable irq
@@ -60,9 +110,7 @@ reset:
     stx PPUMASK ; disable screen output 
     stx DMC_FREQ ; disable APU DMC (delta modulation channel) irqs
 
-    vbwait1:
-        bit PPUSTATUS
-        bpl vbwait1
+    jsr nmiwaitunsafe
     
     clearmem:
         lda #$00
@@ -77,9 +125,7 @@ reset:
         inx
         bne clearmem
 
-    vbwait2:
-        bit PPUSTATUS
-        bpl vbwait2
+    jsr nmiwaitunsafe
 
     ldpalettes:
         lda PPUSTATUS ; read from $2002 to clear PPUADDR write flag
@@ -111,7 +157,7 @@ reset:
         lda #$80 ; nmi enable
         sta PPUCTRL
 
-        lda #$10 ; sprite enable
+        lda #%00010000 ; sprite enable
         sta PPUMASK
 
     initpos:
@@ -170,13 +216,8 @@ reset:
         sta square+Sprite_1x1::ypos
 
     @endinput:
-        jsr nmiwait
+        jsr nmiwaitsafe
         jmp main
-
-    nmiwait:
-        bit PPUSTATUS
-        bpl nmiwait
-        rts
 
     readcnt1:
         lda #$01
@@ -191,34 +232,6 @@ reset:
         rol cnt1buttons
         bcc @ldbuttons
         rts
-
-nmi:
-    svregs:
-        pha
-        tya
-        pha
-        txa
-        pha
-
-    initoam:
-        ldx #$00    ; OAMADDR 0
-        stx OAMADDR
-        clc
-
-    oamtransfer:
-        lda square, x
-        sta OAMDATA
-        inx
-        cpx .sizeof(Sprite_1x1) - 1
-        bne oamtransfer
-
-    ldregs:
-        pla
-        tax
-        pla
-        tay
-        pla
-        rti
 
     bgpalettes:
     ; BG palettes, 4 total
