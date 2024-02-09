@@ -1,3 +1,10 @@
+; TODO:
+; rename subroutines to have a consistent convention
+; rewrite palette data transfer to use size of Palette struct
+; delete unused startup segment
+; fix oam data transfer bug with comparison of X
+; add missing register definitions
+
 PPUCTRL = $2000 ; PPU control flags
                 ; VPHB SINN
                 ; NMI enable (V) PPU master/slave (P) sprite height (H) background tile select (B)
@@ -59,6 +66,7 @@ nmi:
         pha
         txa
         pha
+
         lda #$01
         sta nmiflag
 
