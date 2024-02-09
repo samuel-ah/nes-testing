@@ -79,8 +79,8 @@ nmi:
         lda square, x
         sta OAMDATA
         inx
-        cpx .sizeof(Sprite_1x1) - 1
-        bne oamtransfer
+        cpx .sizeof(Sprite_1x1)     ; broken, only does not branch when X = 0
+        bne oamtransfer             ; should branch only when x is from 1 - 3
 
     ldregs:
         pla
@@ -92,7 +92,7 @@ nmi:
 
 nmiwaitunsafe:
     bit PPUSTATUS
-    bpl nmiwait
+    bpl nmiwaitunsafe
     rts
 
 nmiwaitsafe:
@@ -257,14 +257,15 @@ reset:
 
 .segment "CHARS"
     ; sprite 0
-    .byte %11111111 ; 00000000
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %11111111 ; 00000000
+;;;;;;;;;;;;;;;;;;;;;;;
+    .byte %11111111 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %11111111
 
     .byte %00000000
     .byte %01111110
@@ -274,3 +275,4 @@ reset:
     .byte %01111110
     .byte %01111110
     .byte %00000000
+;;;;;;;;;;;;;;;;;;;;;;;
