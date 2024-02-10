@@ -85,7 +85,7 @@ nmi:
 
 nmiwaitunsafe:
     bit PPUSTATUS
-    bpl nmiwait
+    bpl nmiwaitunsafe
     rts
 
 nmiwaitsafe:
@@ -250,14 +250,15 @@ reset:
 
 .segment "CHARS"
     ; sprite 0
-    .byte %11111111 ; 00000000
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %10000001 ; 01111110
-    .byte %11111111 ; 00000000
+;;;;;;;;;;;;;;;;;;;;;;;
+    .byte %11111111 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %10000001 
+    .byte %11111111
 
     .byte %00000000
     .byte %01111110
@@ -267,3 +268,4 @@ reset:
     .byte %01111110
     .byte %01111110
     .byte %00000000
+;;;;;;;;;;;;;;;;;;;;;;;
