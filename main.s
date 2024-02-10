@@ -2,6 +2,8 @@
 ; fix oam data transfer bug with comparison of X
 ; add missing register definitions
 
+; Note: do NOT use .sizeof() to define constants in runtime
+
 PPUCTRL = $2000 ; PPU control flags
                 ; VPHB SINN
                 ; NMI enable (V) PPU master/slave (P) sprite height (H) background tile select (B)
@@ -72,7 +74,7 @@ nmi:
         lda square, x
         sta OAMDATA
         inx
-        cpx .sizeof(Sprite_1x1)
+        cpx #$04 ; size of 1 sprite (1 x #$04 bytes)
         bne transferoam
 
     ldregs:
@@ -142,7 +144,7 @@ reset:
         lda bgpalettes, x
         sta PPUDATA
         inx
-        cpx .sizeof(Palette) * 4
+        cpx #$10 ; size of 4 palettes (4 * #$04 bytes)
         bne @ldbgpalette
     
         ldx #$00
@@ -151,8 +153,8 @@ reset:
         lda sprpalettes, x
         sta PPUDATA
         inx
-        cpx .sizeof(Palette) * 4
-        bne @sprpaletteld
+        cpx #$10 ; size of 4 palettes (4 * #$04 bytes)
+        bne @ldsprpalette
 
     enablerender:
         lda #$80 ; nmi enable
