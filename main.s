@@ -1,7 +1,4 @@
 ; TODO:
-; rename subroutines to have a consistent convention
-; rewrite palette data transfer to use size of Palette struct
-; delete unused startup segment
 ; fix oam data transfer bug with comparison of X
 ; add missing register definitions
 
@@ -9,7 +6,6 @@ PPUCTRL = $2000 ; PPU control flags
                 ; VPHB SINN
                 ; NMI enable (V) PPU master/slave (P) sprite height (H) background tile select (B)
                 ; sprite tile select (S) increment mode (I) nametable select (NN)
-
 PPUMASK = $2001 ; mask control, color settings **use greyscale mask for interesting effect ?
 PPUSTATUS = $2002 ; PPU status flags
                   ; VSO- ---- 
@@ -21,7 +17,6 @@ OAMDATA = $2004 ; OAM data read/write
 PPUADDR = $2006 ; PPU accessing address read/write (2 byte address, HI byte first. Read from $2002 before this.)
 PPUDATA = $2007 
 DMC_FREQ = $4010
-
 CNTPORT1 = $4016
 CNTPORT2 = $4017
 
@@ -51,8 +46,6 @@ CNTPORT2 = $4017
     .addr reset
     .addr 0 ; irq unused
 
-.segment "STARTUP"
-
 .segment "ZEROPAGE"
     square: .res .sizeof(Sprite_1x1)
     cnt1buttons: .res 1
@@ -75,12 +68,12 @@ nmi:
         stx OAMADDR
         clc
 
-    oamtransfer:
+    transferoam:
         lda square, x
         sta OAMDATA
         inx
-        cpx .sizeof(Sprite_1x1) - 1
-        bne oamtransfer
+        cpx .sizeof(Sprite_1x1)
+        bne transferoam
 
     ldregs:
         pla
@@ -145,20 +138,20 @@ reset:
 
         ldx #$00
 
-    @bgpaletteld:
+    @ldbgpalette:
         lda bgpalettes, x
         sta PPUDATA
         inx
-        cpx #$10
-        bne @bgpaletteld
+        cpx .sizeof(Palette) * 4
+        bne @ldbgpalette
     
         ldx #$00
 
-    @sprpaletteld:
+    @ldsprpalette:
         lda sprpalettes, x
         sta PPUDATA
         inx
-        cpx #$10
+        cpx .sizeof(Palette) * 4
         bne @sprpaletteld
 
     enablerender:
