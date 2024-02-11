@@ -32,9 +32,31 @@ NUMSPRS = 4
 
 .struct Sprite_1x1
     ypos .byte
-    index .byte
-    attributes .byte
+    ptrnindex .byte
+    attrs .byte
     xpos .byte
+.endstruct
+
+.struct Sprite_4x4
+    ypos0 .byte
+    ptrnindex0 .byte
+    attrs0 .byte
+    xpos0 .byte
+
+    ypos1 .byte
+    ptrnindex1 .byte
+    attrs1 .byte
+    xpos1 .byte
+
+    ypos2 .byte
+    ptrnindex2 .byte
+    attrs2 .byte
+    xpos2 .byte
+
+    ypos3 .byte
+    ptrnindex3 .byte
+    attrs3 .byte
+    xpos3 .byte
 .endstruct
 
 .segment "HEADER"
@@ -53,6 +75,8 @@ NUMSPRS = 4
     player: .res .sizeof(Sprite_1x1) * NUMSPRS
     joy1buttons: .res 1
     nmiflag: .res 1
+
+.segment "STARTUP" ; unused rn but compiler yells at me :(
 
 .segment "CODE"
 nmi:
@@ -169,12 +193,12 @@ reset:
         lda #$10 ; starting y
         sta player+Sprite_1x1::ypos
         ldx #$01
-        stx player+Sprite_1x1::index + SPRSIZE ; starting pos is same for all 4 player sprites, gets
+        stx player+Sprite_1x1::ptrnindex + SPRSIZE ; starting pos is same for all 4 player sprites, gets
                                                ; fixed at first NMI before first frame is even drawn
         inx
-        stx player+Sprite_1x1::index + (2 * SPRSIZE)
+        stx player+Sprite_1x1::ptrnindex + (2 * SPRSIZE)
         inx
-        stx player+Sprite_1x1::index + (3 * SPRSIZE)
+        stx player+Sprite_1x1::ptrnindex + (3 * SPRSIZE)
 
     main:
         jsr readjoy1 ; would this lead to less noticeable input lag to do at the end of the frame ?
