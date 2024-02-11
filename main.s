@@ -1,6 +1,9 @@
 ; TODO:
-; fix oam data transfer bug with comparison of X
-; add missing register definitions
+; sprite art ?
+; figure out background displaying
+; basic shooter ?
+; CPU enemies ?
+; collision ?
 
 ; Note: do NOT use .sizeof() to define constants in runtime
 
@@ -19,8 +22,13 @@ OAMDATA = $2004 ; OAM data read/write
 PPUADDR = $2006 ; PPU accessing address read/write (2 byte address, HI byte first. Read from $2002 before this.)
 PPUDATA = $2007 
 DMC_FREQ = $4010
-CNTPORT1 = $4016
+JOYPAD1 = $4016
 CNTPORT2 = $4017
+
+SPRSIZE = 4
+SPRWIDTHHEIGHT = 8
+PALETTESIZE = 4
+NUMSPRS = 4
 
 .struct Sprite_1x1
     ypos .byte
@@ -42,8 +50,8 @@ CNTPORT2 = $4017
     .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
-    player: .res .sizeof(Sprite_1x1) * 4
-    cnt1buttons: .res 1
+    player: .res .sizeof(Sprite_1x1) * NUMSPRS
+    joy1buttons: .res 1
     nmiflag: .res 1
 
 .segment "CODE"
@@ -107,7 +115,7 @@ reset:
 
     jsr nmiwaitunsafe
     
-    clearmem:
+    clearmem: ; X must be 0 to start
         lda #$00
         sta $0000, x
         sta $0100, x
@@ -136,7 +144,7 @@ reset:
         lda bgpalettes, x
         sta PPUDATA
         inx
-        cpx #$10 ; size of 4 palettes (4 * #$04 bytes)
+        cpx #(PALETTESIZE * 4) ; size of 4 palettes (4 * #$04 bytes)
         bne @ldbgpalette
     
         ldx #$00
@@ -145,7 +153,7 @@ reset:
         lda sprpalettes, x
         sta PPUDATA
         inx
-        cpx #$10 ; size of 4 palettes (4 * #$04 bytes)
+        cpx #(PALETTESIZE * 4) ; size of 4 palettes (4 * #$04 bytes)
         bne @ldsprpalette
 
     enablerender:
@@ -156,36 +164,38 @@ reset:
         sta PPUMASK
 
     initpos:
-        lda #$08
+        lda #$08 ; starting x
         sta player+Sprite_1x1::xpos
-        lda #$10
+        lda #$10 ; starting y
         sta player+Sprite_1x1::ypos
         ldx #$01
-        stx player+Sprite_1x1::index + 4
+        stx player+Sprite_1x1::index + SPRSIZE ; starting pos is same for all 4 player sprites, gets
+                                               ; fixed at first NMI before first frame is even drawn
         inx
-        stx player+Sprite_1x1::index + 8
+        stx player+Sprite_1x1::index + (2 * SPRSIZE)
         inx
-        stx player+Sprite_1x1::index + 12
+        stx player+Sprite_1x1::index + (3 * SPRSIZE)
 
     main:
-        jsr readcnt1
+        jsr readjoy1 ; would this lead to less noticeable input lag to do at the end of the frame ?
+                     ; thoughts for when more game logic is in the program
     ; 76543210
     ; ABsSUDLR - controller buttons
 
     @left:
-        lda cnt1buttons
-        and #%00000010
-        beq @up
+        lda joy1buttons
+        and #%00000010 ; left on dpad
+        beq @up ; branch if AND leaves A with $00 in it
         lda player+Sprite_1x1::xpos
-        cmp #$08
+        cmp #$08 ; skip moving to left if it would move sprites behind mask
         beq @up
         sec
         sbc #$01
         sta player+Sprite_1x1::xpos
         
     @up:
-        lda cnt1buttons
-        and #%00001000
+        lda joy1buttons
+        and #%00001000 ; up on dpad
         beq @right
         lda player+Sprite_1x1::ypos
         cmp #$0e
@@ -195,8 +205,8 @@ reset:
         sta player+Sprite_1x1::ypos
     
     @right:
-        lda cnt1buttons
-        and #%00000001
+        lda joy1buttons
+        and #%00000001 ; right on dpad
         beq @down
         lda player+Sprite_1x1::xpos
         cmp #$f0
@@ -206,8 +216,8 @@ reset:
         sta player+Sprite_1x1::xpos
 
     @down:
-        lda cnt1buttons
-        and #%00000100
+        lda joy1buttons
+        and #%00000100 ; down on dpad
         beq @updatepos
         lda player +Sprite_1x1::ypos
         cmp #$d7
@@ -218,33 +228,33 @@ reset:
 
     @updatepos:
         lda player+Sprite_1x1::xpos
-        sta player+Sprite_1x1::xpos + 8 ; same xpos for corner in bottom left of 2x2 sprite
-        clc
-        adc #$08 ; top and bottom right are $08 pixels to the left
-        sta player+Sprite_1x1::xpos + 4
-        sta player+Sprite_1x1::xpos + 12
+        sta player+Sprite_1x1::xpos + (2 * SPRSIZE) ; same xpos for corner in bottom left of 2x2 sprite
+        clc ; might not be necessary?
+        adc #(SPRWIDTHHEIGHT) ; top right and bottom right sprites are $08 pixels to the right
+        sta player+Sprite_1x1::xpos + SPRSIZE
+        sta player+Sprite_1x1::xpos + (3 * SPRSIZE)
 
         lda player+Sprite_1x1::ypos
-        sta player+Sprite_1x1::ypos + 4
-        clc
-        adc #$08
-        sta player+Sprite_1x1::ypos + 8
-        sta player+Sprite_1x1::ypos + 12
+        sta player+Sprite_1x1::ypos + SPRSIZE
+        clc ; might not be necessary?
+        adc #(SPRWIDTHHEIGHT)
+        sta player+Sprite_1x1::ypos + (2 * SPRSIZE)
+        sta player+Sprite_1x1::ypos + (3 * SPRSIZE)
         jsr nmiwaitsafe
         jmp main
 
-    readcnt1:
+    readjoy1:
         lda #$01
-        sta CNTPORT1 ; write 1 then 0 to controller port to start serial transfer
-        sta cnt1buttons ; store 1 in buttons
+        sta JOYPAD1 ; write 1 then 0 to controller port to start serial transfer
+        sta joy1buttons ; store 1 in buttons
         lsr a ; A: 1 -> 0
-        sta CNTPORT1
+        sta JOYPAD1
 
     @ldbuttons:
-        lda CNTPORT1
-        lsr a
-        rol cnt1buttons
-        bcc @ldbuttons
+        lda JOYPAD1
+        lsr a ; bit 0 -> C
+        rol joy1buttons ; C -> bit 0 in joy1buttons, shift all other to left
+        bcc @ldbuttons ; if sentinel bit shifted out end loop
         rts
 
     bgpalettes:
