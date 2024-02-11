@@ -29,13 +29,6 @@ CNTPORT2 = $4017
     xpos .byte
 .endstruct
 
-.struct Palette
-    col0 .byte
-    col1 .byte
-    col2 .byte
-    col3 .byte
-.endstruct
-
 .segment "HEADER"
     .byte "NES", $1a    ; iNES header format
     .byte $02           ; 2 segments 16kb PRG
@@ -49,7 +42,7 @@ CNTPORT2 = $4017
     .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
-    square: .res .sizeof(Sprite_1x1)
+    player: .res .sizeof(Sprite_1x1) * 4
     cnt1buttons: .res 1
     nmiflag: .res 1
 
@@ -68,13 +61,12 @@ nmi:
     initoam:
         ldx #$00    ; OAMADDR 0
         stx OAMADDR
-        clc
 
     transferoam:
-        lda square, x
+        lda player, x
         sta OAMDATA
         inx
-        cpx #$04 ; size of 1 sprite (1 x #$04 bytes)
+        cpx #$10 ; size of 4 sprite (4 x #$04 bytes)
         bne transferoam
 
     ldregs:
@@ -165,9 +157,15 @@ reset:
 
     initpos:
         lda #$08
-        sta square+Sprite_1x1::xpos
+        sta player+Sprite_1x1::xpos
         lda #$10
-        sta square+Sprite_1x1::ypos
+        sta player+Sprite_1x1::ypos
+        ldx #$01
+        stx player+Sprite_1x1::index + 4
+        inx
+        stx player+Sprite_1x1::index + 8
+        inx
+        stx player+Sprite_1x1::index + 12
 
     main:
         jsr readcnt1
@@ -178,47 +176,60 @@ reset:
         lda cnt1buttons
         and #%00000010
         beq @up
-        lda square+Sprite_1x1::xpos
+        lda player+Sprite_1x1::xpos
         cmp #$08
         beq @up
         sec
         sbc #$01
-        sta square+Sprite_1x1::xpos
+        sta player+Sprite_1x1::xpos
         
     @up:
         lda cnt1buttons
         and #%00001000
         beq @right
-        lda square+Sprite_1x1::ypos
+        lda player+Sprite_1x1::ypos
         cmp #$0e
         beq @right
         sec
         sbc #$01
-        sta square+Sprite_1x1::ypos
+        sta player+Sprite_1x1::ypos
     
     @right:
         lda cnt1buttons
         and #%00000001
         beq @down
-        lda square+Sprite_1x1::xpos
+        lda player+Sprite_1x1::xpos
         cmp #$f0
         beq @down
         clc
         adc #$01
-        sta square+Sprite_1x1::xpos
+        sta player+Sprite_1x1::xpos
 
     @down:
         lda cnt1buttons
         and #%00000100
-        beq @endinput
-        lda square +Sprite_1x1::ypos
+        beq @updatepos
+        lda player +Sprite_1x1::ypos
         cmp #$d7
-        beq @endinput
+        beq @updatepos
         clc
         adc #$01
-        sta square+Sprite_1x1::ypos
+        sta player+Sprite_1x1::ypos
 
-    @endinput:
+    @updatepos:
+        lda player+Sprite_1x1::xpos
+        sta player+Sprite_1x1::xpos + 8 ; same xpos for corner in bottom left of 2x2 sprite
+        clc
+        adc #$08 ; top and bottom right are $08 pixels to the left
+        sta player+Sprite_1x1::xpos + 4
+        sta player+Sprite_1x1::xpos + 12
+
+        lda player+Sprite_1x1::ypos
+        sta player+Sprite_1x1::ypos + 4
+        clc
+        adc #$08
+        sta player+Sprite_1x1::ypos + 8
+        sta player+Sprite_1x1::ypos + 12
         jsr nmiwaitsafe
         jmp main
 
@@ -245,7 +256,7 @@ reset:
 
     sprpalettes:
         ; SPR palettes, 4 total
-        .byte $0f, $12, $20, $00 ; SPR palette 1 ;; black, blue, white, empty
+        .byte $19, $12, $20, $15 ; SPR palette 1 ;; green, blue, white, red
         .byte $00, $00, $00, $00 ; SPR palette 2 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 3 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
@@ -253,21 +264,84 @@ reset:
 .segment "CHARS"
     ; sprite 0
 ;;;;;;;;;;;;;;;;;;;;;;;
-    .byte %11111111 
-    .byte %10000001 
-    .byte %10000001 
-    .byte %10000001 
-    .byte %10000001 
-    .byte %10000001 
-    .byte %10000001 
+    .byte %00000000
+    .byte %00010000
+    .byte %00110000
+    .byte %00010000
+    .byte %00010000
+    .byte %00010000
+    .byte %00111000
+    .byte %00000000
+
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %11111111
+;;;;;;;;;;;;;;;;;;;;;;;
+
+    ; sprite 1
+;;;;;;;;;;;;;;;;;;;;;;;
+    .byte %10000000
+    .byte %10011000
+    .byte %10100100 
+    .byte %10000100
+    .byte %10001000
+    .byte %10010000
+    .byte %10111100
     .byte %11111111
 
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %11111111
+;;;;;;;;;;;;;;;;;;;;;;;
+
+    ; sprite 2
+;;;;;;;;;;;;;;;;;;;;;;;
+    .byte %11111111
+    .byte %00000001
+    .byte %00011001 
+    .byte %00100101
+    .byte %00001001
+    .byte %00100101
+    .byte %00011001
+    .byte %00000001
+
+    .byte %11111111
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+    .byte %00000001
+;;;;;;;;;;;;;;;;;;;;;;;
+
+    ; sprite 3
+;;;;;;;;;;;;;;;;;;;;;;;
     .byte %00000000
-    .byte %01111110
-    .byte %01111110
-    .byte %01111110
-    .byte %01111110
-    .byte %01111110
-    .byte %01111110
     .byte %00000000
+    .byte %00001100
+    .byte %00010100
+    .byte %00111110
+    .byte %00000100
+    .byte %00000100
+    .byte %00000000
+
+    .byte %11111111
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
+    .byte %10000000
 ;;;;;;;;;;;;;;;;;;;;;;;
