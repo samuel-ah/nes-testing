@@ -98,7 +98,7 @@ nmi:
         lda player, x
         sta OAMDATA
         inx
-        cpx #$10 ; size of 4 sprite (4 x #$04 bytes)
+        cpx #(NUMSPRS * SPRSIZE) ; size of 4 sprite (4 x #$04 bytes)
         bne transferoam
 
     ldregs:
@@ -194,7 +194,7 @@ reset:
         sta player+Sprite_1x1::ypos
         ldx #$01
         stx player+Sprite_1x1::ptrnindex + SPRSIZE ; starting pos is same for all 4 player sprites, gets
-                                               ; fixed at first NMI before first frame is even drawn
+                                                   ; fixed at first NMI before first frame is even drawn
         inx
         stx player+Sprite_1x1::ptrnindex + (2 * SPRSIZE)
         inx
@@ -290,7 +290,7 @@ reset:
 
     sprpalettes:
         ; SPR palettes, 4 total
-        .byte $19, $12, $20, $15 ; SPR palette 1 ;; green, blue, white, red
+        .byte $0f, $12, $20, $15 ; SPR palette 1 ;; black, blue, white, red
         .byte $00, $00, $00, $00 ; SPR palette 2 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 3 ;; empty
         .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
