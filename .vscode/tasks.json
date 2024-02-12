@@ -4,7 +4,7 @@
 		{
 			"label": "Build and run .s file",
 			"type": "shell",
-			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o demo.nes main.s; if (Test-Path demo.nes.deb) {Remove-Item demo.nes.deb --verbose}; fceux/fceux64 demo.nes",
+			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o demo.nes main.s; if (Test-Path demo.nes.deb) {Remove-Item demo.nes.deb}; fceux/fceux64 demo.nes",
 			"group": {
 				"kind": "build",
 				"isDefault": true

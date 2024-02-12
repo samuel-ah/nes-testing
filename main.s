@@ -28,7 +28,7 @@ CNTPORT2 = $4017
 SPRSIZE = 4
 SPRWIDTHHEIGHT = 8
 PALETTESIZE = 4
-NUMSPRS = 4
+NUMPLYRSPRS = 5
 
 .struct Sprite_1x1
     ypos .byte
@@ -72,7 +72,8 @@ NUMSPRS = 4
     .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
-    player: .res .sizeof(Sprite_1x1) * NUMSPRS
+    player: .res .sizeof(Sprite_4x4)
+    enemy: .res .sizeof(Sprite_1x1)
     joy1buttons: .res 1
     nmiflag: .res 1
 
@@ -94,12 +95,21 @@ nmi:
         ldx #$00    ; OAMADDR 0
         stx OAMADDR
 
-    transferoam:
+    transferplyr:
         lda player, x
         sta OAMDATA
         inx
-        cpx #(NUMSPRS * SPRSIZE) ; size of 4 sprite (4 x #$04 bytes)
-        bne transferoam
+        cpx #(NUMPLYRSPRS * SPRSIZE) ; size of 4 sprite (4 x #$04 bytes)
+        bne transferplyr
+
+    ldx #$00
+
+    transferenemy:
+        lda enemy, x
+        sta OAMADDR
+        inx
+        cpx #(SPRSIZE)
+        bne transferenemy
 
     ldregs:
         pla
@@ -193,12 +203,18 @@ reset:
         lda #$10 ; starting y
         sta player+Sprite_1x1::ypos
         ldx #$01
-        stx player+Sprite_1x1::ptrnindex + SPRSIZE ; starting pos is same for all 4 player sprites, gets
+        stx player+Sprite_4x4::ptrnindex1 ; starting pos is same for all 4 player sprites, gets
                                                    ; fixed at first NMI before first frame is even drawn
         inx
-        stx player+Sprite_1x1::ptrnindex + (2 * SPRSIZE)
+        stx player+Sprite_4x4::ptrnindex2
         inx
-        stx player+Sprite_1x1::ptrnindex + (3 * SPRSIZE)
+        stx player+Sprite_4x4::ptrnindex3
+        inx
+        lda #$08
+        sta enemy+Sprite_1x1::xpos
+        lda #$10
+        sta enemy+Sprite_1x1::ypos
+        stx enemy+Sprite_1x1::ptrnindex
 
     main:
         jsr readjoy1 ; would this lead to less noticeable input lag to do at the end of the frame ?
@@ -210,60 +226,69 @@ reset:
         lda joy1buttons
         and #%00000010 ; left on dpad
         beq @up ; branch if AND leaves A with $00 in it
-        lda player+Sprite_1x1::xpos
+        lda player+Sprite_4x4::xpos0
         cmp #$08 ; skip moving to left if it would move sprites behind mask
         beq @up
         sec
         sbc #$01
-        sta player+Sprite_1x1::xpos
+        sta player+Sprite_4x4::xpos0
         
     @up:
         lda joy1buttons
         and #%00001000 ; up on dpad
         beq @right
-        lda player+Sprite_1x1::ypos
+        lda player+Sprite_4x4::ypos0
         cmp #$0e
         beq @right
         sec
         sbc #$01
-        sta player+Sprite_1x1::ypos
+        sta player+Sprite_4x4::ypos0
     
     @right:
         lda joy1buttons
         and #%00000001 ; right on dpad
         beq @down
-        lda player+Sprite_1x1::xpos
+        lda player+Sprite_4x4::xpos0
         cmp #$f0
         beq @down
         clc
         adc #$01
-        sta player+Sprite_1x1::xpos
+        sta player+Sprite_4x4::xpos0
 
     @down:
         lda joy1buttons
         and #%00000100 ; down on dpad
         beq @updatepos
-        lda player +Sprite_1x1::ypos
+        lda player+Sprite_4x4::ypos0
         cmp #$d7
         beq @updatepos
         clc
         adc #$01
-        sta player+Sprite_1x1::ypos
+        sta player+Sprite_4x4::ypos0
 
     @updatepos:
-        lda player+Sprite_1x1::xpos
-        sta player+Sprite_1x1::xpos + (2 * SPRSIZE) ; same xpos for corner in bottom left of 2x2 sprite
+        lda player+Sprite_4x4::xpos0
+        sta player+Sprite_4x4::xpos2 ; same xpos for corner in bottom left of 2x2 sprite
         clc ; might not be necessary?
         adc #(SPRWIDTHHEIGHT) ; top right and bottom right sprites are $08 pixels to the right
-        sta player+Sprite_1x1::xpos + SPRSIZE
-        sta player+Sprite_1x1::xpos + (3 * SPRSIZE)
+        sta player+Sprite_4x4::xpos1
+        sta player+Sprite_4x4::xpos3
 
-        lda player+Sprite_1x1::ypos
-        sta player+Sprite_1x1::ypos + SPRSIZE
+        lda player+Sprite_4x4::ypos0
+        sta player+Sprite_4x4::ypos1
         clc ; might not be necessary?
         adc #(SPRWIDTHHEIGHT)
-        sta player+Sprite_1x1::ypos + (2 * SPRSIZE)
-        sta player+Sprite_1x1::ypos + (3 * SPRSIZE)
+        sta player+Sprite_4x4::ypos2
+        sta player+Sprite_4x4::ypos3
+
+        ldx enemy+Sprite_1x1::xpos
+        inx
+        stx enemy+Sprite_1x1::xpos
+        
+        ;ldx enemy+Sprite_1x1::ypos
+        ;inx
+        ;stx enemy+Sprite_1x1::ypos
+
         jsr nmiwaitsafe
         jmp main
 
@@ -378,4 +403,25 @@ reset:
     .byte %10000000
     .byte %10000000
     .byte %10000000
+;;;;;;;;;;;;;;;;;;;;;;;
+
+    ; sprite 4
+;;;;;;;;;;;;;;;;;;;;;;;
+    .byte %00011000
+    .byte %00111100
+    .byte %01111110
+    .byte %11111111
+    .byte %11111111
+    .byte %01111110
+    .byte %00111100
+    .byte %00011000
+
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
 ;;;;;;;;;;;;;;;;;;;;;;;
