@@ -1,7 +1,6 @@
 ; TODO:
 ; sprite art ?
 ; figure out background displaying
-; basic shooter ?
 ; CPU enemies ?
 ; collision ?
 
@@ -25,10 +24,14 @@ DMC_FREQ = $4010
 JOYPAD1 = $4016
 CNTPORT2 = $4017
 
-SPRSIZE = 4
 SPRWIDTHHEIGHT = 8
-PALETTESIZE = 4
-NUMPLYRSPRS = 5
+
+.struct Palette
+    col0 .byte
+    col1 .byte
+    col2 .byte
+    col3 .byte
+.endstruct
 
 .struct Sprite_1x1
     ypos .byte
@@ -73,9 +76,10 @@ NUMPLYRSPRS = 5
 
 .segment "ZEROPAGE"
     player: .res .sizeof(Sprite_4x4)
-    enemy: .res .sizeof(Sprite_1x1)
+    shot: .res .sizeof(Sprite_1x1)
     joy1buttons: .res 1
     nmiflag: .res 1
+    dispshot: .res 1
 
 .segment "STARTUP" ; unused rn but compiler yells at me :(
 
@@ -99,17 +103,17 @@ nmi:
         lda player, x
         sta OAMDATA
         inx
-        cpx #(NUMPLYRSPRS * SPRSIZE) ; size of 4 sprite (4 x #$04 bytes)
+        cpx #(.sizeof(Sprite_4x4)) ; size of 4 sprite (4 x #$04 bytes)
         bne transferplyr
 
     ldx #$00
 
-    transferenemy:
-        lda enemy, x
-        sta OAMADDR
+    transfershot:
+        lda shot, x
+        sta OAMDATA
         inx
-        cpx #(SPRSIZE)
-        bne transferenemy
+        cpx #(.sizeof(Sprite_1x1))
+        bne transfershot
 
     ldregs:
         pla
@@ -178,7 +182,7 @@ reset:
         lda bgpalettes, x
         sta PPUDATA
         inx
-        cpx #(PALETTESIZE * 4) ; size of 4 palettes (4 * #$04 bytes)
+        cpx #(.sizeof(Palette) * 4) ; size of 4 palettes (4 * #$04 bytes)
         bne @ldbgpalette
     
         ldx #$00
@@ -187,7 +191,7 @@ reset:
         lda sprpalettes, x
         sta PPUDATA
         inx
-        cpx #(PALETTESIZE * 4) ; size of 4 palettes (4 * #$04 bytes)
+        cpx #(.sizeof(Palette) * 4) ; size of 4 palettes (4 * #$04 bytes)
         bne @ldsprpalette
 
     enablerender:
@@ -209,18 +213,39 @@ reset:
         stx player+Sprite_4x4::ptrnindex2
         inx
         stx player+Sprite_4x4::ptrnindex3
-        inx
-        lda #$08
-        sta enemy+Sprite_1x1::xpos
-        lda #$10
-        sta enemy+Sprite_1x1::ypos
-        stx enemy+Sprite_1x1::ptrnindex
+
+        inx ; X -> 4 (shot sprite)
+
+        lda #$00
+        sta shot+Sprite_1x1::xpos
+        sta shot+Sprite_1x1::ypos
+        stx shot+Sprite_1x1::ptrnindex
 
     main:
+        nop ; identify start of execution
         jsr readjoy1 ; would this lead to less noticeable input lag to do at the end of the frame ?
                      ; thoughts for when more game logic is in the program
     ; 76543210
     ; ABsSUDLR - controller buttons
+
+    @shoot:
+        lda joy1buttons
+        and #%10000000
+        beq @left
+
+        lda dispshot
+        bne @left ; skip moving shot to player when shot is already on screen
+
+        lda #$01
+        sta dispshot
+
+        lda player+Sprite_4x4::xpos0
+        adc #$03
+        sta shot+Sprite_1x1::xpos
+        lda player+Sprite_4x4::ypos0
+        sec ; carry flag did a fucky !!!!!!
+        sbc #$03
+        sta shot+Sprite_1x1::ypos
 
     @left:
         lda joy1buttons
@@ -281,14 +306,22 @@ reset:
         sta player+Sprite_4x4::ypos2
         sta player+Sprite_4x4::ypos3
 
-        ldx enemy+Sprite_1x1::xpos
-        inx
-        stx enemy+Sprite_1x1::xpos
-        
-        ;ldx enemy+Sprite_1x1::ypos
-        ;inx
-        ;stx enemy+Sprite_1x1::ypos
+        lda dispshot
+        beq @endframe
+        lda shot+Sprite_1x1::ypos
+        sec
+        sbc #$02
+        cmp #$f8
+        bcs @resetshot ; pos >255-SPRWIDTHHEIGHT
+        sta shot+Sprite_1x1::ypos
+        jmp @endframe
 
+    @resetshot:
+        lda #$00
+        sta dispshot
+        sta shot+Sprite_1x1::xpos ; hide behind left mask
+
+    @endframe:
         jsr nmiwaitsafe
         jmp main
 
@@ -407,21 +440,21 @@ reset:
 
     ; sprite 4
 ;;;;;;;;;;;;;;;;;;;;;;;
-    .byte %00011000
-    .byte %00111100
-    .byte %01111110
-    .byte %11111111
-    .byte %11111111
-    .byte %01111110
-    .byte %00111100
-    .byte %00011000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
+    .byte %00000000
 
     .byte %00000000
-    .byte %00000000
-    .byte %00000000
-    .byte %00000000
-    .byte %00000000
-    .byte %00000000
-    .byte %00000000
+    .byte %00011000
+    .byte %00100100
+    .byte %00010000
+    .byte %00001000
+    .byte %00100100
+    .byte %00011000
     .byte %00000000
 ;;;;;;;;;;;;;;;;;;;;;;;
