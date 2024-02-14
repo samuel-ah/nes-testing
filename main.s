@@ -3,8 +3,8 @@
 ; figure out background displaying
 ; CPU enemies ?
 ; collision ?
-
-; Note: do NOT use .sizeof() to define constants in runtime
+; read ca65 user guide
+; more comments
 
 PPUCTRL = $2000 ; PPU control flags
                 ; VPHB SINN
@@ -62,6 +62,65 @@ SPRWIDTHHEIGHT = 8
     xpos3 .byte
 .endstruct
 
+; .struct Sprite_4x4
+;     .struct UL
+;         ypos .byte
+;         ptrnindex .byte
+;         attrs .byte
+;         xpos .byte
+;     .endstruct
+
+;     .struct UR
+;         ypos .byte
+;         ptrnindex .byte
+;         attrs .byte
+;         xpos .byte
+;     .endstruct
+
+;     .struct BL
+;         ypos .byte
+;         ptrnindex .byte
+;         attrs .byte
+;         xpos .byte
+;     .endstruct
+
+;     .struct BR
+;         ypos .byte
+;         ptrnindex .byte
+;         attrs .byte
+;         xpos .byte
+;     .endstruct
+; .endstruct
+
+.proc nmiwaitunsafe
+    bit PPUSTATUS
+    bpl nmiwaitunsafe
+    rts
+.endproc
+
+.proc nmiwaitsafe
+    lda nmiflag
+    beq nmiwaitsafe
+    lda #$00
+    sta nmiflag
+    rts
+.endproc
+
+.proc readjoy1
+    lda #$01
+    sta JOYPAD1 ; write 1 then 0 to controller port to start serial transfer
+    sta joy1buttons ; store 1 in buttons
+    lsr a ; A: 1 -> 0
+    sta JOYPAD1
+
+    :   lda JOYPAD1
+        lsr a ; bit 0 -> C
+        rol joy1buttons ; C -> bit 0 in joy1buttons, shift all other to left
+        bcc :- ; if sentinel bit shifted out end loop
+    
+    rts
+.endproc
+
 .segment "HEADER"
     .byte "NES", $1a    ; iNES header format
     .byte $02           ; 2 segments 16kb PRG
@@ -75,8 +134,8 @@ SPRWIDTHHEIGHT = 8
     .addr 0 ; irq unused
 
 .segment "ZEROPAGE"
-    player: .res .sizeof(Sprite_4x4)
-    shot: .res .sizeof(Sprite_1x1)
+    player: .tag Sprite_4x4
+    shot: .tag Sprite_1x1
     joy1buttons: .res 1
     nmiflag: .res 1
     dispshot: .res 1
@@ -85,55 +144,41 @@ SPRWIDTHHEIGHT = 8
 
 .segment "CODE"
 nmi:
-    svregs:
-        pha
-        tya
-        pha
-        txa
-        pha
+@svregs:
+    pha
+    tya
+    pha
+    txa
+    pha
 
-        lda #$01
-        sta nmiflag
+    lda #$01
+    sta nmiflag
 
-    initoam:
-        ldx #$00    ; OAMADDR 0
-        stx OAMADDR
+@initoam:
+    ldx #$00    ; OAMADDR 0
+    stx OAMADDR
 
-    transferplyr:
-        lda player, x
+    :   lda player, x
         sta OAMDATA
         inx
-        cpx #(.sizeof(Sprite_4x4)) ; size of 4 sprite (4 x #$04 bytes)
-        bne transferplyr
+        cpx #(.sizeof(player)) ; size of 4 sprite (4 x #$04 bytes)
+        bne :-
 
     ldx #$00
 
-    transfershot:
-        lda shot, x
+    :   lda shot, x
         sta OAMDATA
         inx
-        cpx #(.sizeof(Sprite_1x1))
-        bne transfershot
+        cpx #(.sizeof(shot))
+        bne :-
 
-    ldregs:
-        pla
-        tax
-        pla
-        tay
-        pla
-        rti
-
-nmiwaitunsafe:
-    bit PPUSTATUS
-    bpl nmiwaitunsafe
-    rts
-
-nmiwaitsafe:
-    lda nmiflag
-    beq nmiwaitsafe
-    lda #$00
-    sta nmiflag
-    rts
+@ldregs:
+    pla
+    tax
+    pla
+    tay
+    pla
+    rti
 
 reset:
     sei ; disable irq
@@ -153,8 +198,7 @@ reset:
 
     jsr nmiwaitunsafe
     
-    clearmem: ; X must be 0 to start
-        lda #$00
+    :   lda #$00
         sta $0000, x
         sta $0100, x
         sta $0200, x
@@ -164,194 +208,159 @@ reset:
         sta $0600, x
         sta $0700, x
         inx
-        bne clearmem
+        bne :-
 
     jsr nmiwaitunsafe
 
-    ldpalettes:
-        lda PPUSTATUS ; read from $2002 to clear PPUADDR write flag
+@ldpalettes:
+    lda PPUSTATUS ; read from $2002 to clear PPUADDR write flag
 
-        lda #$3f
-        sta PPUADDR
-        lda #$00
-        sta PPUADDR
+    lda #$3f     ;set PPUADDR to $3f00
+    sta PPUADDR
+    lda #$00
+    sta PPUADDR
 
-        ldx #$00
+    ldx #$00
 
-    @ldbgpalette:
-        lda bgpalettes, x
+    :   lda palettes, x
         sta PPUDATA
         inx
-        cpx #(.sizeof(Palette) * 4) ; size of 4 palettes (4 * #$04 bytes)
-        bne @ldbgpalette
+        cpx #(.sizeof(Palette) * 8) ; size of 4 palettes (4 * #$04 bytes)
+        bne :-
+
+@enablerender:
+    lda #%10000000 ; nmi enable
+    sta PPUCTRL
+
+    lda #%00010000 ; sprite enable
+    sta PPUMASK
+
+@initpos:
+    lda #$08 ; starting x
+    sta player+Sprite_4x4::xpos0
+    lda #$10 ; starting y
+    sta player+Sprite_4x4::ypos0
+    ldx #$01
+    stx player+Sprite_4x4::ptrnindex1 ; starting pos is same for all 4 player sprites, gets
+                                                ; fixed at first NMI before first frame is even drawn
+    inx
+    stx player+Sprite_4x4::ptrnindex2
+    inx
+    stx player+Sprite_4x4::ptrnindex3
+
+    inx ; X -> 4 (shot sprite)
+
+    lda #$00
+    sta shot+Sprite_1x1::xpos
+    sta shot+Sprite_1x1::ypos
+    stx shot+Sprite_1x1::ptrnindex
+
+@main:
+    nop ; identify start of execution
+    jsr readjoy1 ; would this lead to less noticeable input lag to do later in the frame ?
+                    ; thoughts for when more game logic is in the program
+; 76543210
+; ABsSUDLR - controller buttons
+
+@shoot:
+    lda joy1buttons
+    and #%10000000
+    beq @setmove
+    lda dispshot
+    bne @setmove ; skip moving shot to player when shot is already on screen
+    lda #$01
+    sta dispshot
+
+    lda player+Sprite_4x4::xpos0
+    adc #$03
+    sta shot+Sprite_1x1::xpos
+    lda player+Sprite_4x4::ypos0
+    sec ; carry flag did a fucky !!!!!!
+    sbc #$03
+    sta shot+Sprite_1x1::ypos
+
+@setmove:
+    lda joy1buttons
+    and #%00000010 ; left on dpad
+    beq :+ ; branch if no button held
+    ldx player+Sprite_4x4::xpos0
+    cpx #$08 ; skip moving to left if it would move sprites behind mask
+    beq :+
+    dex
+    stx player+Sprite_4x4::xpos0
     
-        ldx #$00
+:   lda joy1buttons
+    and #%00001000 ; up
+    beq :+
+    ldx player+Sprite_4x4::ypos0
+    cpx #$0e
+    beq :+
+    dex
+    stx player+Sprite_4x4::ypos0
 
-    @ldsprpalette:
-        lda sprpalettes, x
-        sta PPUDATA
-        inx
-        cpx #(.sizeof(Palette) * 4) ; size of 4 palettes (4 * #$04 bytes)
-        bne @ldsprpalette
+:   lda joy1buttons
+    and #%00000001 ; right
+    beq :+
+    ldx player+Sprite_4x4::xpos0
+    cpx #$f0
+    beq :+
+    inx
+    stx player+Sprite_4x4::xpos0
 
-    enablerender:
-        lda #$80 ; nmi enable
-        sta PPUCTRL
+:   lda joy1buttons
+    and #%00000100 ; down
+    beq @updatepos
+    ldx player+Sprite_4x4::ypos0
+    cpx #$d7
+    beq @updatepos
+    inx
+    stx player+Sprite_4x4::ypos0
 
-        lda #%00010000 ; sprite enable
-        sta PPUMASK
+@updatepos:
+    lda player+Sprite_4x4::xpos0
+    sta player+Sprite_4x4::xpos2 ; same xpos for corner in bottom left of 2x2 sprite
+    clc ; might not be necessary?
+    adc #(SPRWIDTHHEIGHT) ; top right and bottom right sprites are $08 pixels to the right
+    sta player+Sprite_4x4::xpos1
+    sta player+Sprite_4x4::xpos3
 
-    initpos:
-        lda #$08 ; starting x
-        sta player+Sprite_1x1::xpos
-        lda #$10 ; starting y
-        sta player+Sprite_1x1::ypos
-        ldx #$01
-        stx player+Sprite_4x4::ptrnindex1 ; starting pos is same for all 4 player sprites, gets
-                                                   ; fixed at first NMI before first frame is even drawn
-        inx
-        stx player+Sprite_4x4::ptrnindex2
-        inx
-        stx player+Sprite_4x4::ptrnindex3
+    lda player+Sprite_4x4::ypos0
+    sta player+Sprite_4x4::ypos1
+    clc ; might not be necessary?
+    adc #(SPRWIDTHHEIGHT)
+    sta player+Sprite_4x4::ypos2
+    sta player+Sprite_4x4::ypos3
 
-        inx ; X -> 4 (shot sprite)
+    lda dispshot
+    beq @endframe
+    ldx shot+Sprite_1x1::ypos
+    dex
+    dex
+    cpx #$f8
+    bcs :+ ; if pos >255-SPRWIDTHHEIGHT
+    stx shot+Sprite_1x1::ypos
+    jmp @endframe
 
-        lda #$00
-        sta shot+Sprite_1x1::xpos
-        sta shot+Sprite_1x1::ypos
-        stx shot+Sprite_1x1::ptrnindex
+:   lda #$00
+    sta dispshot
+    sta shot+Sprite_1x1::xpos ; hide behind left mask
 
-    main:
-        nop ; identify start of execution
-        jsr readjoy1 ; would this lead to less noticeable input lag to do at the end of the frame ?
-                     ; thoughts for when more game logic is in the program
-    ; 76543210
-    ; ABsSUDLR - controller buttons
+@endframe:
+    jsr nmiwaitsafe
+    jmp @main
 
-    @shoot:
-        lda joy1buttons
-        and #%10000000
-        beq @left
-
-        lda dispshot
-        bne @left ; skip moving shot to player when shot is already on screen
-
-        lda #$01
-        sta dispshot
-
-        lda player+Sprite_4x4::xpos0
-        adc #$03
-        sta shot+Sprite_1x1::xpos
-        lda player+Sprite_4x4::ypos0
-        sec ; carry flag did a fucky !!!!!!
-        sbc #$03
-        sta shot+Sprite_1x1::ypos
-
-    @left:
-        lda joy1buttons
-        and #%00000010 ; left on dpad
-        beq @up ; branch if AND leaves A with $00 in it
-        lda player+Sprite_4x4::xpos0
-        cmp #$08 ; skip moving to left if it would move sprites behind mask
-        beq @up
-        sec
-        sbc #$01
-        sta player+Sprite_4x4::xpos0
-        
-    @up:
-        lda joy1buttons
-        and #%00001000 ; up on dpad
-        beq @right
-        lda player+Sprite_4x4::ypos0
-        cmp #$0e
-        beq @right
-        sec
-        sbc #$01
-        sta player+Sprite_4x4::ypos0
+palettes:
+; BG palettes, 4 total
+    .byte $0f, $00, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
+    .byte $00, $00, $00, $00 ; BG palette 2 ;; empty
+    .byte $00, $00, $00, $00 ; BG palette 3 ;; empty
+    .byte $00, $00, $00, $00 ; BG palette 4 ;; empty
     
-    @right:
-        lda joy1buttons
-        and #%00000001 ; right on dpad
-        beq @down
-        lda player+Sprite_4x4::xpos0
-        cmp #$f0
-        beq @down
-        clc
-        adc #$01
-        sta player+Sprite_4x4::xpos0
-
-    @down:
-        lda joy1buttons
-        and #%00000100 ; down on dpad
-        beq @updatepos
-        lda player+Sprite_4x4::ypos0
-        cmp #$d7
-        beq @updatepos
-        clc
-        adc #$01
-        sta player+Sprite_4x4::ypos0
-
-    @updatepos:
-        lda player+Sprite_4x4::xpos0
-        sta player+Sprite_4x4::xpos2 ; same xpos for corner in bottom left of 2x2 sprite
-        clc ; might not be necessary?
-        adc #(SPRWIDTHHEIGHT) ; top right and bottom right sprites are $08 pixels to the right
-        sta player+Sprite_4x4::xpos1
-        sta player+Sprite_4x4::xpos3
-
-        lda player+Sprite_4x4::ypos0
-        sta player+Sprite_4x4::ypos1
-        clc ; might not be necessary?
-        adc #(SPRWIDTHHEIGHT)
-        sta player+Sprite_4x4::ypos2
-        sta player+Sprite_4x4::ypos3
-
-        lda dispshot
-        beq @endframe
-        lda shot+Sprite_1x1::ypos
-        sec
-        sbc #$02
-        cmp #$f8
-        bcs @resetshot ; pos >255-SPRWIDTHHEIGHT
-        sta shot+Sprite_1x1::ypos
-        jmp @endframe
-
-    @resetshot:
-        lda #$00
-        sta dispshot
-        sta shot+Sprite_1x1::xpos ; hide behind left mask
-
-    @endframe:
-        jsr nmiwaitsafe
-        jmp main
-
-    readjoy1:
-        lda #$01
-        sta JOYPAD1 ; write 1 then 0 to controller port to start serial transfer
-        sta joy1buttons ; store 1 in buttons
-        lsr a ; A: 1 -> 0
-        sta JOYPAD1
-
-    @ldbuttons:
-        lda JOYPAD1
-        lsr a ; bit 0 -> C
-        rol joy1buttons ; C -> bit 0 in joy1buttons, shift all other to left
-        bcc @ldbuttons ; if sentinel bit shifted out end loop
-        rts
-
-    bgpalettes:
-    ; BG palettes, 4 total
-        .byte $0f, $00, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
-        .byte $00, $00, $00, $00 ; BG palette 2 ;; empty
-        .byte $00, $00, $00, $00 ; BG palette 3 ;; empty
-        .byte $00, $00, $00, $00 ; BG palette 4 ;; empty
-
-    sprpalettes:
-        ; SPR palettes, 4 total
-        .byte $0f, $12, $20, $15 ; SPR palette 1 ;; black, blue, white, red
-        .byte $00, $00, $00, $00 ; SPR palette 2 ;; empty
-        .byte $00, $00, $00, $00 ; SPR palette 3 ;; empty
-        .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
+; SPR palettes, 4 total
+    .byte $0f, $12, $20, $15 ; SPR palette 1 ;; black, blue, white, red
+    .byte $00, $00, $00, $00 ; SPR palette 2 ;; empty
+    .byte $00, $00, $00, $00 ; SPR palette 3 ;; empty
+    .byte $00, $00, $00, $00 ; SPR palette 4 ;; empty
 
 .segment "CHARS"
     ; sprite 0
