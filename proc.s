@@ -48,6 +48,10 @@
     bcc miss
     lda #$00
     sta enemy+Sprite_1x1::xpos
+    sta dispshot
+    sta shot+Sprite_1x1::xpos
+    lda #$08
+    sta shot+Sprite_1x1::ypos
 
 miss:   rts
 .endproc

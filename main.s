@@ -112,7 +112,7 @@ reset:
     :   lda palettes, x
         sta PPUDATA
         inx
-        cpx #(.sizeof(Palette) * 8) ; size of 4 palettes (4 * #$04 bytes)
+        cpx #(.sizeof(Palette) * 8) ; size of 8 palettes (4 * #$04 bytes)
         bne :-
 
 @enablerender:
@@ -235,22 +235,22 @@ reset:
     dex
     dex
     cpx #$f8
-    bcs :+ ; if pos >255-SPRWIDTHHEIGHT
-    stx shot+Sprite_1x1::ypos
+    bcc :+ ; if pos >255-SPRWIDTHHEIGHT
+    lda #$00
+    sta dispshot
+    sta shot+Sprite_1x1::xpos
+:   stx shot+Sprite_1x1::ypos
     jsr hit
     jmp @endframe
 
-:   lda #$00
-    sta dispshot
-    sta shot+Sprite_1x1::xpos ; hide behind left mask
+; :   lda #$00
+;     sta dispshot
+;     sta shot+Sprite_1x1::xpos ; hide behind left mask
 
 
 @endframe:
     jsr nmiwaitsafe
     jmp @main
-
-
-
 
 palettes:
 ; BG palettes, 4 total
