@@ -2,9 +2,9 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build and run .s file",
+			"label": "Build NES",
 			"type": "shell",
-			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o demo.nes main.s; if (Test-Path demo.nes.deb) {Remove-Item demo.nes.deb}; fceux/fceux64 demo.nes",
+			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o fceux/demo.nes main.s; if (Test-Path fceux/demo.nes.deb) {Remove-Item fceux/demo.nes.deb}; fceux/fceux64 fceux/demo.nes",
 			"group": {
 				"kind": "build",
 				"isDefault": true
