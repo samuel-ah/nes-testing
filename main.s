@@ -5,6 +5,7 @@
 ; collision ?
 ; read ca65 user guide
 ; more comments
+; change nes.cfg to have $00FD as zp size
 
 .include "define.s"
 .include "header.s"
@@ -15,6 +16,7 @@
 .segment "ZEROPAGE"
     player: .tag Sprite_4x4
     shot: .tag Sprite_1x1
+    enemy: .tag Sprite_1x1
     joy1buttons: .res 1
     nmiflag: .res 1
     dispshot: .res 1
@@ -47,6 +49,14 @@ nmi:
         sta OAMDATA
         inx
         cpx #(.sizeof(shot))
+        bne :-
+
+    ldx #$00
+    
+    :   lda enemy, X
+        sta OAMDATA
+        inx
+        cpx #(.sizeof(enemy))
         bne :-
 
 @ldregs:
@@ -113,9 +123,9 @@ reset:
     sta PPUMASK
 
 @initpos:
-    lda #$08 ; starting x
+    lda #$80 ; starting x
     sta player+Sprite_4x4::xpos0
-    lda #$10 ; starting y
+    lda #$d0 ; starting y
     sta player+Sprite_4x4::ypos0
     ldx #$01
     stx player+Sprite_4x4::ptrnindex1 ; starting pos is same for all 4 player sprites, gets
@@ -131,6 +141,13 @@ reset:
     sta shot+Sprite_1x1::xpos
     sta shot+Sprite_1x1::ypos
     stx shot+Sprite_1x1::ptrnindex
+
+    lda #$16
+    sta enemy+Sprite_1x1::xpos
+    lda #$10
+    sta enemy+Sprite_1x1::ypos
+    lda #$05
+    sta enemy+Sprite_1x1::ptrnindex
 
 @main:
     nop ; identify start of execution
@@ -208,6 +225,10 @@ reset:
     sta player+Sprite_4x4::ypos2
     sta player+Sprite_4x4::ypos3
 
+    ldx enemy+Sprite_1x1::xpos
+    inx
+    stx enemy+Sprite_1x1::xpos
+
     lda dispshot
     beq @endframe
     ldx shot+Sprite_1x1::ypos
@@ -216,15 +237,20 @@ reset:
     cpx #$f8
     bcs :+ ; if pos >255-SPRWIDTHHEIGHT
     stx shot+Sprite_1x1::ypos
+    jsr hit
     jmp @endframe
 
 :   lda #$00
     sta dispshot
     sta shot+Sprite_1x1::xpos ; hide behind left mask
 
+
 @endframe:
     jsr nmiwaitsafe
     jmp @main
+
+
+
 
 palettes:
 ; BG palettes, 4 total
