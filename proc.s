@@ -29,29 +29,35 @@
 
 .proc hit
     lda enemy+Sprite_1x1::xpos
+    clc
+    sbc #$06
     cmp shot+Sprite_1x1::xpos
     beq :+
     bcs miss
-    
 :   clc
-    adc #$08
+    adc #$0e
     cmp shot+Sprite_1x1::xpos
     bcc miss
-    lda enemy+Sprite_1x1::ypos
-    cmp shot+Sprite_1x1::ypos
-    beq :+
-    bcs miss
 
+    lda enemy+Sprite_1x1::ypos
+    clc
+    sbc #$06
+    cmp shot+Sprite_1x1::ypos
+    beq :+
+    bcs miss
 :   clc
-    adc #$08
+    adc #$0e
     cmp shot+Sprite_1x1::ypos
     bcc miss
+
     lda #$00
     sta enemy+Sprite_1x1::xpos
+    inc enemy+Sprite_1x1::xpos
     sta dispshot
     sta shot+Sprite_1x1::xpos
     lda #$08
     sta shot+Sprite_1x1::ypos
 
-miss:   rts
+miss:   
+    rts
 .endproc

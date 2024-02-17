@@ -142,9 +142,9 @@ reset:
     sta shot+Sprite_1x1::ypos
     stx shot+Sprite_1x1::ptrnindex
 
-    lda #$16
+    lda #$50
     sta enemy+Sprite_1x1::xpos
-    lda #$10
+    lda #$50
     sta enemy+Sprite_1x1::ypos
     lda #$05
     sta enemy+Sprite_1x1::ptrnindex
@@ -242,11 +242,6 @@ reset:
 :   stx shot+Sprite_1x1::ypos
     jsr hit
     jmp @endframe
-
-; :   lda #$00
-;     sta dispshot
-;     sta shot+Sprite_1x1::xpos ; hide behind left mask
-
 
 @endframe:
     jsr nmiwaitsafe
