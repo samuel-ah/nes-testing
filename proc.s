@@ -30,23 +30,23 @@
 .proc hit
     lda enemy+Sprite_1x1::xpos
     clc
-    sbc #$06
+    sbc #$06 ; greater than pos - 6
     cmp shot+Sprite_1x1::xpos
     beq :+
     bcs miss
 :   clc
-    adc #$0e
+    adc #$0e ; less than pos + 8
     cmp shot+Sprite_1x1::xpos
     bcc miss
 
     lda enemy+Sprite_1x1::ypos
     clc
-    sbc #$06
+    sbc #$06 ; greater than pos - 6
     cmp shot+Sprite_1x1::ypos
     beq :+
     bcs miss
 :   clc
-    adc #$0e
+    adc #$0e ; less than pos + 8
     cmp shot+Sprite_1x1::ypos
     bcc miss
 
