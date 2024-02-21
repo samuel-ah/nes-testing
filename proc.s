@@ -7,13 +7,13 @@
 .proc nmiwaitsafe
     lda nmiflag
     beq nmiwaitsafe
-    lda #$00
+    lda #0
     sta nmiflag
     rts
 .endproc
 
 .proc readjoy1
-    lda #$01
+    lda #1
     sta JOYPAD1 ; write 1 then 0 to controller port to start serial transfer
     sta joy1buttons ; store 1 in buttons
     lsr a ; A: 1 -> 0
@@ -30,32 +30,34 @@
 .proc hit
     lda enemy+Sprite_1x1::xpos
     clc
-    sbc #$06 ; greater than pos - 6
+    sbc #6 ; greater than pos - 6
     cmp shot+Sprite_1x1::xpos
     beq :+
-    bcs miss
-:   clc
-    adc #$0e ; less than pos + 8
+        bcs miss
+    :   
+    clc
+    adc #14 ; less than pos + 8
     cmp shot+Sprite_1x1::xpos
     bcc miss
 
     lda enemy+Sprite_1x1::ypos
     clc
-    sbc #$06 ; greater than pos - 6
+    sbc #6 ; greater than pos - 6
     cmp shot+Sprite_1x1::ypos
     beq :+
-    bcs miss
-:   clc
-    adc #$0e ; less than pos + 8
+        bcs miss
+    :
+    clc
+    adc #14 ; less than pos + 8
     cmp shot+Sprite_1x1::ypos
     bcc miss
 
-    lda #$00
+hide:
+    lda #0
     sta enemy+Sprite_1x1::xpos
-    inc enemy+Sprite_1x1::xpos
     sta dispshot
     sta shot+Sprite_1x1::xpos
-    lda #$08
+    lda #8
     sta shot+Sprite_1x1::ypos
 
 miss:   

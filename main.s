@@ -30,11 +30,11 @@ nmi:
     txa
     pha
 
-    lda #$01
+    lda #1
     sta nmiflag
 
 @initoam:
-    ldx #$00    ; OAMADDR 0
+    ldx #0    ; OAMADDR 0
     stx OAMADDR
 
     :   lda player, x
@@ -43,7 +43,7 @@ nmi:
         cpx #(.sizeof(player)) ; size of 4 sprite (4 x #$04 bytes)
         bne :-
 
-    ldx #$00
+    ldx #0
 
     :   lda shot, x
         sta OAMDATA
@@ -51,9 +51,9 @@ nmi:
         cpx #(.sizeof(shot))
         bne :-
 
-    ldx #$00
+    ldx #0
     
-    :   lda enemy, X
+    :   lda enemy, x
         sta OAMDATA
         inx
         cpx #(.sizeof(enemy))
@@ -85,7 +85,7 @@ reset:
 
     jsr nmiwaitunsafe
     
-    :   lda #$00
+    :   lda #0
         sta $0000, x
         sta $0100, x
         sta $0200, x
@@ -107,7 +107,7 @@ reset:
     lda #$00
     sta PPUADDR
 
-    ldx #$00
+    ldx #00
 
     :   lda palettes, x
         sta PPUDATA
@@ -123,13 +123,13 @@ reset:
     sta PPUMASK
 
 @initpos:
-    lda #$80 ; starting x
+    lda #128 ; starting x
     sta player+Sprite_4x4::xpos0
-    lda #$d0 ; starting y
+    lda #200 ; starting y
     sta player+Sprite_4x4::ypos0
-    ldx #$01
+    ldx #1
     stx player+Sprite_4x4::ptrnindex1 ; starting pos is same for all 4 player sprites, gets
-                                                ; fixed at first NMI before first frame is even drawn
+                                      ; fixed at first NMI before first frame is even drawn
     inx
     stx player+Sprite_4x4::ptrnindex2
     inx
@@ -137,91 +137,101 @@ reset:
 
     inx ; X -> 4 (shot sprite)
 
-    lda #$00
+    lda #0
     sta shot+Sprite_1x1::xpos
     sta shot+Sprite_1x1::ypos
     stx shot+Sprite_1x1::ptrnindex
 
-    lda #$50
+    inx ; X -> 5 (enemy sprite)
+
+    lda #100
     sta enemy+Sprite_1x1::xpos
-    lda #$50
     sta enemy+Sprite_1x1::ypos
-    lda #$05
-    sta enemy+Sprite_1x1::ptrnindex
+    stx enemy+Sprite_1x1::ptrnindex
 
 @main:
     nop ; identify start of execution
     jsr readjoy1 ; would this lead to less noticeable input lag to do later in the frame ?
                     ; thoughts for when more game logic is in the program
-; 76543210
-; ABsSUDLR - controller buttons
 
 @shoot:
     lda joy1buttons
-    and #%10000000
-    beq @setmove
-    lda dispshot
-    bne @setmove ; skip moving shot to player when shot is already on screen
-    lda #$01
-    sta dispshot
+    and #PAD_A
+    beq :++
+        lda dispshot
+        bne :+ ; skip moving shot to player when shot is already on screen
+            lda #1
+            sta dispshot
 
-    lda player+Sprite_4x4::xpos0
-    adc #$03
-    sta shot+Sprite_1x1::xpos
-    lda player+Sprite_4x4::ypos0
-    sec ; carry flag did a fucky !!!!!!
-    sbc #$03
-    sta shot+Sprite_1x1::ypos
+            lda player+Sprite_4x4::xpos0
+            clc
+            adc #4
+            sta shot+Sprite_1x1::xpos
+
+            lda player+Sprite_4x4::ypos0
+            clc
+            sbc #4
+            sta shot+Sprite_1x1::ypos
+        :
+    :
 
 @setmove:
     lda joy1buttons
-    and #%00000010 ; left on dpad
-    beq :+ ; branch if no button held
-    ldx player+Sprite_4x4::xpos0
-    cpx #$08 ; skip moving to left if it would move sprites behind mask
-    beq :+
-    dex
-    stx player+Sprite_4x4::xpos0
-    
-:   lda joy1buttons
-    and #%00001000 ; up
-    beq :+
-    ldx player+Sprite_4x4::ypos0
-    cpx #$0e
-    beq :+
-    dex
-    stx player+Sprite_4x4::ypos0
+    and #PAD_LEFT
+    beq :++ ; branch if no button held
+        ldx player+Sprite_4x4::xpos0
+        cpx #8 ; skip moving to left if it would move sprites behind mask
+        beq :+
+            dex
+            stx player+Sprite_4x4::xpos0
+        :
+    :
 
-:   lda joy1buttons
-    and #%00000001 ; right
-    beq :+
-    ldx player+Sprite_4x4::xpos0
-    cpx #$f0
-    beq :+
-    inx
-    stx player+Sprite_4x4::xpos0
+    lda joy1buttons
+    and #PAD_UP ; up
+    beq :++
+        ldx player+Sprite_4x4::ypos0
+        cpx #14
+        beq :+
+            dex
+            stx player+Sprite_4x4::ypos0
+        :
+    :
 
-:   lda joy1buttons
-    and #%00000100 ; down
-    beq @updatepos
-    ldx player+Sprite_4x4::ypos0
-    cpx #$d7
-    beq @updatepos
-    inx
-    stx player+Sprite_4x4::ypos0
+    lda joy1buttons
+    and #PAD_RIGHT ; right
+    beq :++
+        ldx player+Sprite_4x4::xpos0
+        cpx #232
+        beq :+
+            inx
+            stx player+Sprite_4x4::xpos0
+        :
+    :
+
+    lda joy1buttons
+    and #PAD_DOWN ; down
+    beq :++
+        ldx player+Sprite_4x4::ypos0
+        cpx #207
+        beq :+
+            inx
+            stx player+Sprite_4x4::ypos0
+        :
+    :
 
 @updatepos:
     lda player+Sprite_4x4::xpos0
     sta player+Sprite_4x4::xpos2 ; same xpos for corner in bottom left of 2x2 sprite
-    clc ; might not be necessary?
-    adc #(SPRWIDTHHEIGHT) ; top right and bottom right sprites are $08 pixels to the right
+    clc
+    adc #SPRWIDTHHEIGHT ; top right and bottom right sprites are $08 pixels to the right
     sta player+Sprite_4x4::xpos1
     sta player+Sprite_4x4::xpos3
 
     lda player+Sprite_4x4::ypos0
     sta player+Sprite_4x4::ypos1
-    clc ; might not be necessary?
-    adc #(SPRWIDTHHEIGHT)
+    clc 
+    adc #SPRWIDTHHEIGHT
     sta player+Sprite_4x4::ypos2
     sta player+Sprite_4x4::ypos3
 
@@ -230,18 +240,20 @@ reset:
     stx enemy+Sprite_1x1::xpos
 
     lda dispshot
-    beq @endframe
-    ldx shot+Sprite_1x1::ypos
-    dex
-    dex
-    cpx #$f8
-    bcc :+ ; if pos >255-SPRWIDTHHEIGHT
-    lda #$00
-    sta dispshot
-    sta shot+Sprite_1x1::xpos
-:   stx shot+Sprite_1x1::ypos
-    jsr hit
-    jmp @endframe
+    beq :++
+        ldx shot+Sprite_1x1::ypos
+        dex
+        dex
+        cpx #248
+        bcc :+ ; if pos >255-SPRWIDTHHEIGHT
+            lda #0
+            sta dispshot
+            sta shot+Sprite_1x1::xpos
+        :
+        stx shot+Sprite_1x1::ypos
+        jsr hit
+        jmp @endframe
+    :
 
 @endframe:
     jsr nmiwaitsafe

@@ -4,7 +4,7 @@
 		{
 			"label": "Build NES",
 			"type": "shell",
-			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o fceux/demo.nes main.s; if (Test-Path fceux/demo.nes.deb) {Remove-Item fceux/demo.nes.deb}; fceux/fceux64 fceux/demo.nes",
+			"command": "C:\\cc65\\bin\\cl65 --verbose --target nes -o fceux/demo.nes main.s; if (Test-Path fceux/demo.nes.deb) {Remove-Item fceux/demo.nes.deb}; if (Test-Path main.o) {Remove-Item main.o}; fceux/fceux64 fceux/demo.nes",
 			"group": {
 				"kind": "build",
 				"isDefault": true
