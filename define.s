@@ -11,11 +11,14 @@ PPUSTATUS = $2002 ; PPU status flags
 OAMADDR = $2003 ; points to address of OAM being used, usually ignored and set to $00 as DMA is better
 OAMDATA = $2004 ; OAM data read/write
 PPUADDR = $2006 ; PPU accessing address read/write (2 byte address, HI byte first. Read from $2002 before this.)
-PPUDATA = $2007 
+PPUDATA = $2007 ; PPU data write
 DMC_FREQ = $4010
 JOYPAD1 = $4016
 JOYPAD2 = $4017
-
+ZP_START = $0000
+ZP_SIZE = $FF
+OAM_BUF = $0200
+OAM_BUF_SIZE = $FF
 PAD_A = $80
 PAD_B = $40
 PAD_SELECT = $20
@@ -24,5 +27,4 @@ PAD_UP = $08
 PAD_DOWN = $04
 PAD_LEFT = $02
 PAD_RIGHT = $01
-
 SPRWIDTHHEIGHT = 8
