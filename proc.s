@@ -63,3 +63,9 @@ hide:
 miss:   
     rts
 .endproc
+
+; .proc ppubuftrans
+;     lda PPU_BUF
+
+;     rts
+; .endproc

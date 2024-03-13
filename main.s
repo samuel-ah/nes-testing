@@ -1,11 +1,8 @@
 ; TODO:
 ; sprite art ?
 ; figure out background displaying
-; CPU enemies ?
-; collision ?
 ; read ca65 user guide
 ; more comments
-; change nes.cfg to have $00FD as zp size
 
 .include "define.s"
 .include "header.s"
@@ -14,12 +11,12 @@
 .include "chars.s"
 
 .segment "ZEROPAGE"
-    player: .tag Sprite_4x4
-    shot: .tag Sprite_1x1
-    enemy: .tag Sprite_1x1
     joy1buttons: .res 1
     nmiflag: .res 1
     dispshot: .res 1
+    player: .tag Sprite_4x4 ; rewrite struct for xpos, ypos, idxs into SPR table
+    shot: .tag Sprite_1x1
+    enemy: .tag Sprite_1x1
 
 .segment "CODE"
 nmi:
@@ -37,27 +34,27 @@ nmi:
     ldx #0    ; OAMADDR 0
     stx OAMADDR
 
-    :   lda player, x
-        sta OAMDATA
-        inx
-        cpx #(.sizeof(player)) ; size of 4 sprite (4 x #$04 bytes)
-        bne :-
+:   lda player, x
+    sta OAMDATA
+    inx
+    cpx #(.sizeof(player)) ; size of 4 sprite (4 x #$04 bytes)
+    bne :-
 
-    ldx #0
+ldx #0
 
-    :   lda shot, x
-        sta OAMDATA
-        inx
-        cpx #(.sizeof(shot))
-        bne :-
+:   lda shot, x
+    sta OAMDATA
+    inx
+    cpx #(.sizeof(shot))
+    bne :-
 
-    ldx #0
-    
-    :   lda enemy, x
-        sta OAMDATA
-        inx
-        cpx #(.sizeof(enemy))
-        bne :-
+ldx #0
+
+:   lda enemy, x
+    sta OAMDATA
+    inx
+    cpx #(.sizeof(enemy))
+    bne :-
 
 @ldregs:
     pla
@@ -261,7 +258,7 @@ reset:
 
 palettes:
 ; BG palettes, 4 total
-    .byte $0f, $00, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
+    .byte $0f, $20, $00, $00 ; BG palette 1 ;; black, empty, empty, empty
     .byte $00, $00, $00, $00 ; BG palette 2 ;; empty
     .byte $00, $00, $00, $00 ; BG palette 3 ;; empty
     .byte $00, $00, $00, $00 ; BG palette 4 ;; empty
